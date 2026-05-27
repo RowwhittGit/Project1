@@ -1,4 +1,6 @@
 import nodemailer, { TransportOptions } from "nodemailer";
+import dns from 'dns';
+dns.setDefaultResultOrder('ipv4first');
 
 type SendEmailOptions = {
   to: string;
