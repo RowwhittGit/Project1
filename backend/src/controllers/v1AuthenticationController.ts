@@ -12,19 +12,10 @@ const client = new OAuth2Client();
 
 import admin from 'firebase-admin';
 
-let serviceAccount: admin.ServiceAccount;
-if (process.env["FIREBASE_CREDENTIAL_JSON"]) {
-    serviceAccount = JSON.parse(process.env["FIREBASE_CREDENTIAL_JSON"]);
-} else {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const fs = await import('fs');
-    const path = await import('path');
-    const filePath = path.resolve('./src/config/firebase-credential.json');
-    serviceAccount = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as admin.ServiceAccount;
-}
+const serviceAccount = JSON.parse(process.env.FIREBASE_CREDENTIAL as string);
 
 const firebaseAdmin = admin.initializeApp({
-   credential: admin.credential.cert(serviceAccount)
+   credential: admin.credential.cert(serviceAccount as admin.ServiceAccount)
 });
 
 // * ----------------- MODELS -----------------
