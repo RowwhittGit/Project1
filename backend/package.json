@@ -12,6 +12,9 @@
     "build": "tsc",
     "production": "NODE_ENV=PRODUCTION node dist/server.js"
   },
+  "engines": {
+    "node": "20.19.0"
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
