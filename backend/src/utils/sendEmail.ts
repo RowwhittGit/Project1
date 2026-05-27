@@ -9,10 +9,10 @@ type SendEmailOptions = {
 
 const sendEmail = async ({ to, subject, text, html }: SendEmailOptions) => {
   const transporter = nodemailer.createTransport({
-    // * Cast the options to the TransportOptions type
     host: process.env["SMTP_HOST"] as string,
-    port: process.env["SMTP_PORT"] as string,
-    secure: process.env["NODE_ENV"] as string === "PRODUCTION" ? true : false as boolean,
+    port: Number(process.env["SMTP_PORT"]),
+    secure: false,
+    family: 4,
     auth: {
       user: process.env["SMTP_USER"] as string,
       pass: process.env["SMTP_PASSWORD"] as string,
@@ -30,12 +30,9 @@ const sendEmail = async ({ to, subject, text, html }: SendEmailOptions) => {
   // * Sending email activation account
   transporter.sendMail(emailOptions, (error: any, info: any) => {
     if (error) {
-      console.log({
-        fileName: 'sendEmail.ts',
-        errorDescription: 'There is something problem on the sending the activation link to the user via email.',
-        errorLocation: 'sendEmail',
-        error: error
-      });
+      console.error('SMTP ERROR:', JSON.stringify(error));
+    } else {
+      console.log('Email sent:', info.response);
     }
   });
 };
