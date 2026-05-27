@@ -4,6 +4,7 @@ import * as errorCodes from '../constants/v1AuthenticationErrorCodes.js'; // * C
 import { Error } from '../types/index.js';
 
 function errorHandler (error: Error, req: express.Request, res: express.Response, next: express.NextFunction) {
+    console.error('ERROR:', error);
     // * THIS IS ERROR FROM THE MONGOOSE MODEL VALIDATION USER INPUT
     if (error.name === "ValidationError") {
         const message: any = Object.values(error.errors).map((val: any) => val.message);
