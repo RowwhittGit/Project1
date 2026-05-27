@@ -11,14 +11,16 @@ import { OAuth2Client } from 'google-auth-library';
 const client = new OAuth2Client();
 
 import admin from 'firebase-admin';
-import { createRequire } from 'module';
 
 let serviceAccount: admin.ServiceAccount;
 if (process.env["FIREBASE_CREDENTIAL_JSON"]) {
     serviceAccount = JSON.parse(process.env["FIREBASE_CREDENTIAL_JSON"]);
 } else {
-    const require = createRequire(import.meta.url);
-    serviceAccount = require('../config/firebase-credential.json');
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const fs = await import('fs');
+    const path = await import('path');
+    const filePath = path.resolve('./src/config/firebase-credential.json');
+    serviceAccount = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as admin.ServiceAccount;
 }
 
 const firebaseAdmin = admin.initializeApp({
