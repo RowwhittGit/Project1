@@ -11,7 +11,7 @@ import cluster from 'cluster';
 import os from 'os';
 import colors from 'colors';
 
-const numCPUs = os.cpus().length;
+const numWorkers = Math.min(os.cpus().length, 2);
 
 // * ------------ ROUTERS --------------------
 import v1AuthenticationRouter from './routes/v1AuthenticationRouter.js';
@@ -123,14 +123,15 @@ if (process.env["NODE_ENV"] as string === "PRODUCTION") {
         console.log(`Master ${process.pid} is now running`.yellow);
         console.log(`Workers:`.magenta);
 
-        for(let i = 0; i < numCPUs; i++) {
+        for(let i = 0; i < numWorkers; i++) {
             cluster.fork();
         }
     }else {
+        const PORT = process.env["PORT"] || 4000;
         mongoose.connect(process.env["MONGO_DB_URI"] as string)
         .then(() => {
-            server.listen(process.env["PORT"] as string, () => {
-                console.log(`Worker ${process.pid} is now started and listening on PORT ${process.env["PORT"] as string}`);
+            server.listen(PORT, () => {
+                console.log(`Worker ${process.pid} is now started and listening on PORT ${PORT}`);
             });
         })
         .catch((error) => {
@@ -180,10 +181,11 @@ if (process.env["NODE_ENV"] as string === "PRODUCTION") {
     `);
     console.log("%cHi 👋! The server is now running! \n".green, styles.join(";"));
 
+    const PORT = process.env["PORT"] || 4000;
     mongoose.connect(process.env["MONGO_DB_URI"] as string)
     .then(() => {
-        server.listen(process.env["PORT"] as string, () => {
-            console.log(`Worker ${process.pid} is now started and listening on PORT ${process.env["PORT"] as string}`);
+        server.listen(PORT, () => {
+            console.log(`Worker ${process.pid} is now started and listening on PORT ${PORT}`);
         });
     })
     .catch((error) => {
