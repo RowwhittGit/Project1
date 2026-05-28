@@ -35,7 +35,7 @@ const userSchema: Schema<User> = new Schema<User>(
       trim: true,
       required: [true, 'Email is required'],
       match: [
-        /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/,
+        /^(([^<>()[\]\\.,;:\s@"]+(\.[ ^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/,
         'Please enter a valid email address',
       ],
       validate: [
@@ -77,36 +77,6 @@ const userSchema: Schema<User> = new Schema<User>(
       required: true,
       default: false
     },
-    verificationCodeLogin: { 
-      type: String,
-      select: false,
-      minlength: [7, 'Verification login code must be 7 characters'],
-      maxlength: [7, 'Verification login code must be 7 characters'],
-      match: [
-        /^(?=.*[a-zA-Z])(?=.*[0-9])[a-zA-Z0-9]{7}$/,
-        'Verification login code must be 7 characters and contain only numbers and letters',
-      ],
-      validate: [
-        {
-          validator: function(value: string) {
-            return !/\b(admin|root|superuser)\b/i.test(value);
-          },
-          message: 'Verification login code should not contain sensitive information',
-        },{
-          validator: function(value: string) {
-            const sanitizedValue = he.escape(value);
-            return sanitizedValue === value;
-          },
-          message: 'Invalid verification login code format or potentially unsafe characters',
-        },
-      ]
-    },
-    googleAuthenticator: {
-      type: Schema.Types.ObjectId,
-      select: false,
-      ref: 'GoogleAuthentication',
-      required: false
-    },
     csrfTokenSecret: {
       type: Schema.Types.ObjectId,
       select: false,
@@ -130,7 +100,6 @@ userSchema.pre('save', async function (this: User, next: any) {
   if (!this.isModified('password')) {
     return next();
   }
-
   try {
     const hashedPassword = await argon2.hash(this.password);
     this.password = hashedPassword;
@@ -142,10 +111,6 @@ userSchema.pre('save', async function (this: User, next: any) {
 
 userSchema.methods.matchPasswords = async function (password: string) {
   return await argon2.verify(this.password, password);
-};
-
-userSchema.methods.matchVerificationCodeLogin = async function (verificationCodeLogin: string) {
-  return await argon2.verify(this.verificationCodeLogin, verificationCodeLogin);
 };
 
 export default mongoose.model<User>('User', userSchema);
