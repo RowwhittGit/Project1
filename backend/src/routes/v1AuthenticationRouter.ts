@@ -10,6 +10,7 @@ router.post('/register', middlewareLimiter.registerLimiter, middleware.verifyPub
 router.post('/login', middlewareLimiter.loginLimiter, middleware.verifyPublicCSRFToken, v1AuthenticationController.login);
 router.post('/activate', middlewareLimiter.activateLimiter, middleware.verifyPublicCSRFToken, v1AuthenticationController.activate);
 router.post('/forgot-password', middlewareLimiter.forgotPasswordLimiter, middleware.verifyPublicCSRFToken, v1AuthenticationController.forgotPassword);
+router.post('/refresh', middlewareLimiter.refreshLimiter, v1AuthenticationController.refresh);
 
 // SSO
 router.post('/sso/sign-in/google-identity-services', middlewareLimiter.loginLimiter, middleware.verifyPublicCSRFToken, v1AuthenticationController.ssoSignInGoogleIdentityServices);

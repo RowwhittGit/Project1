@@ -20,3 +20,4 @@ export const resetPasswordLimiter = rateLimit({ store: mongoStore('reset-passwor
 export const resetPasswordVerifyTokenLimiter = rateLimit({ store: mongoStore('reset-password-verify-token-limits'), max: 100, message: 'Too many reset password verify token requests, Please try again later.' });
 export const deleteUserLimiter = rateLimit({ store: mongoStore('delete-user-limits'), max: 100, message: 'Too many delete user requests, Please try again later.' });
 export const logoutLimiter = rateLimit({ store: mongoStore('logout-limits'), max: 100, message: 'Too many logout requests, Please try again later.' });
+export const refreshLimiter = rateLimit({ store: mongoStore('refresh-limits'), max: 100, message: 'Too many refresh requests, Please try again later.' });

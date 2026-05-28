@@ -122,6 +122,10 @@ export const USER_ALREADY_EXIST_SSO_SIGN_UP_FIREBASE_GOOGLE: number = 385;
 export const USER_NOT_EXIST_DELETE_USER: number = 386;
 export const FAILED_DELETE_ACCOUNT_IN_FIREBASE_DATABASE_DELETE_USER: number = 387;
 
+// * ------------- REFRESH TOKEN -------------
+export const NO_REFRESH_TOKEN: number = 388;
+export const INVALID_REFRESH_TOKEN: number = 389;
+
 // * ------------- MODEL MONGOOSE VALIDATION ERROR -------------
 export const MONGOOSE_VALIDATION_ERROR: number = 499;
 

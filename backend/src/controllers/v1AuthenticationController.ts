@@ -12,6 +12,7 @@ const client = new OAuth2Client();
 import User from '../models/userModel.js';
 import Profile from '../models/profileModel.js';
 import CSRFTokenSecret from '../models/csrfTokenSecretModel.js';
+import RefreshToken from '../models/refreshTokenModel.js';
 
 import sendEmail from '../utils/sendEmail.js';
 import ErrorResponse from '../utils/ErrorResponse.js';
@@ -28,6 +29,31 @@ import * as userSettings from '../constants/v1AuthenticationUserSettings.js';
 
 import * as TYPES from '../types/index.js';
 
+// Helper: issue both tokens and set cookies
+async function issueTokens(res: express.Response, userId: string, csrfTokenSecret: string) {
+    const tokens = new Tokens();
+    const csrfToken = tokens.create(csrfTokenSecret);
+
+    const accessToken = jwt.sign({ _id: userId }, process.env["AUTHENTICATION_TOKEN_SECRET"] as string, { expiresIn: jwtTokensSettings.JWT_AUTHENTICATION_TOKEN_EXPIRATION_STRING });
+    const refreshToken = jwt.sign({ _id: userId }, process.env["REFRESH_TOKEN_SECRET"] as string, { expiresIn: jwtTokensSettings.JWT_REFRESH_TOKEN_EXPIRATION_STRING });
+
+    const expiresAt = new Date(Date.now() + cookiesSettings.COOKIE_REFRESH_TOKEN_EXPIRATION);
+    await RefreshToken.create({ token: refreshToken, user_id: userId, expiresAt });
+
+    res.cookie(cookiesSettings.COOKIE_AUTHENTICATION_TOKEN_NAME, accessToken, {
+        httpOnly: true, secure: true, sameSite: 'none', path: '/',
+        expires: new Date(Date.now() + cookiesSettings.COOKIE_AUTHENTICATION_TOKEN_EXPIRATION)
+    });
+    res.cookie(cookiesSettings.COOKIE_REFRESH_TOKEN_NAME, refreshToken, {
+        httpOnly: true, secure: true, sameSite: 'none', path: '/',
+        expires: expiresAt
+    });
+    res.cookie(cookiesSettings.COOKIE_CSRF_TOKEN_NAME, csrfToken, {
+        httpOnly: true, secure: true, sameSite: 'none', path: '/',
+        expires: new Date(Date.now() + cookiesSettings.COOKIE_AUTHENTICATION_TOKEN_EXPIRATION)
+    });
+}
+
 const user = tryCatch(async (req: express.Request, res: express.Response) => {
     let authenticatedUser = lodash.get(req, 'authenticatedUser') as unknown as any;
     authenticatedUser = await User.findOne({ _id: authenticatedUser._id })
@@ -43,6 +69,7 @@ const deleteUser = tryCatch(async (req: express.Request, res: express.Response) 
 
     await Profile.findOneAndDelete({ user_id: userOwner._id });
     await CSRFTokenSecret.findOneAndDelete({ user_id: userOwner._id });
+    await RefreshToken.deleteMany({ user_id: userOwner._id });
     await User.findOneAndDelete({ _id: userOwner._id });
 
     const tokens = new Tokens();
@@ -114,7 +141,6 @@ const activate = tryCatch(async (req: express.Request, res: express.Response) =>
 
     const tokens = new Tokens();
     const csrfTokenSecret = tokens.secretSync();
-    const csrfToken = tokens.create(csrfTokenSecret);
 
     const savedCSRFTokenSecret = await CSRFTokenSecret.create({ secret: csrfTokenSecret });
     const savedProfile = await Profile.create({ fullName, profilePicture: userSettings.DEFAULT_PROFILE_PICTURE });
@@ -127,17 +153,7 @@ const activate = tryCatch(async (req: express.Request, res: express.Response) =>
     await CSRFTokenSecret.findOneAndUpdate({ _id: savedCSRFTokenSecret._id }, { user_id: savedUser._id });
     await Profile.findOneAndUpdate({ _id: savedProfile._id }, { user_id: savedUser._id });
 
-    const authenticationToken = jwt.sign({ _id: savedUser._id }, process.env["AUTHENTICATION_TOKEN_SECRET"] as string, { expiresIn: jwtTokensSettings.JWT_AUTHENTICATION_TOKEN_EXPIRATION_STRING });
-
-    res.cookie(cookiesSettings.COOKIE_AUTHENTICATION_TOKEN_NAME, authenticationToken, {
-        httpOnly: true, secure: true, sameSite: 'none', path: '/',
-        expires: new Date(new Date().getTime() + cookiesSettings.COOKIE_AUTHENTICATION_TOKEN_EXPIRATION)
-    });
-    res.cookie(cookiesSettings.COOKIE_CSRF_TOKEN_NAME, csrfToken, {
-        httpOnly: true, secure: true, sameSite: 'none', path: '/',
-        expires: new Date(new Date().getTime() + cookiesSettings.COOKIE_AUTHENTICATION_TOKEN_EXPIRATION)
-    });
-
+    await issueTokens(res, savedUser._id.toString(), csrfTokenSecret);
     return res.status(200).json({ status: 'ok' });
 });
 
@@ -158,33 +174,25 @@ const login = tryCatch(async (req: express.Request, res: express.Response) => {
 
     if (existingUser.isSSO) throw new ErrorResponse(401, 'This is an SSO account.', errorCodes.USER_SSO_ACCOUNT_LOGIN);
 
-    const tokens = new Tokens();
-    const csrfToken = tokens.create(existingUser.csrfTokenSecret.secret);
-    const authenticationToken = jwt.sign({ _id: existingUser._id }, process.env["AUTHENTICATION_TOKEN_SECRET"] as string, { expiresIn: jwtTokensSettings.JWT_AUTHENTICATION_TOKEN_EXPIRATION_STRING });
-
-    res.cookie(cookiesSettings.COOKIE_AUTHENTICATION_TOKEN_NAME, authenticationToken, {
-        httpOnly: true, secure: true, sameSite: 'none', path: '/',
-        expires: new Date(new Date().getTime() + cookiesSettings.COOKIE_AUTHENTICATION_TOKEN_EXPIRATION)
-    });
-    res.cookie(cookiesSettings.COOKIE_CSRF_TOKEN_NAME, csrfToken, {
-        httpOnly: true, secure: true, sameSite: 'none', path: '/',
-        expires: new Date(new Date().getTime() + cookiesSettings.COOKIE_AUTHENTICATION_TOKEN_EXPIRATION)
-    });
-
+    await issueTokens(res, existingUser._id.toString(), existingUser.csrfTokenSecret.secret);
     return res.status(200).json({ status: 'ok' });
 });
 
 const logout = tryCatch(async (req: express.Request, res: express.Response) => {
-    const csrfToken = new Tokens().create(process.env["PUBLIC_CSRF_TOKEN_SECRET"] as string);
+    const refreshToken = req.cookies[cookiesSettings.COOKIE_REFRESH_TOKEN_NAME];
+    if (refreshToken) await RefreshToken.findOneAndDelete({ token: refreshToken });
 
+    const csrfToken = new Tokens().create(process.env["PUBLIC_CSRF_TOKEN_SECRET"] as string);
     res.cookie(cookiesSettings.COOKIE_AUTHENTICATION_TOKEN_NAME, 'expiredtoken', {
+        httpOnly: true, secure: true, sameSite: 'none', path: '/', expires: new Date(0)
+    });
+    res.cookie(cookiesSettings.COOKIE_REFRESH_TOKEN_NAME, 'expiredtoken', {
         httpOnly: true, secure: true, sameSite: 'none', path: '/', expires: new Date(0)
     });
     res.cookie(cookiesSettings.COOKIE_CSRF_TOKEN_NAME, csrfToken, {
         httpOnly: true, secure: true, sameSite: 'none', path: '/',
         expires: new Date(new Date().getTime() + cookiesSettings.COOKIE_PUBLIC_CSRF_TOKEN_EXPIRATION)
     });
-
     return res.status(200).json({ status: 'ok' });
 });
 
@@ -314,19 +322,7 @@ const ssoSignInGoogleIdentityServices = tryCatch(async (req: express.Request, re
     const existingUser = await User.findOne({ email }).populate('csrfTokenSecret');
     if (!existingUser) throw new ErrorResponse(401, 'User does not exist. Please sign up.', errorCodes.USER_NOT_EXIST_SSO_SIGN_IN_GOOGLE_IDENTITY_SERVICES);
 
-    const tokens = new Tokens();
-    const csrfToken = tokens.create(existingUser.csrfTokenSecret.secret);
-    const authenticationToken = jwt.sign({ _id: existingUser._id }, process.env["AUTHENTICATION_TOKEN_SECRET"] as string, { expiresIn: jwtTokensSettings.JWT_AUTHENTICATION_TOKEN_EXPIRATION_STRING });
-
-    res.cookie(cookiesSettings.COOKIE_AUTHENTICATION_TOKEN_NAME, authenticationToken, {
-        httpOnly: true, secure: true, sameSite: 'none', path: '/',
-        expires: new Date(new Date().getTime() + cookiesSettings.COOKIE_AUTHENTICATION_TOKEN_EXPIRATION)
-    });
-    res.cookie(cookiesSettings.COOKIE_CSRF_TOKEN_NAME, csrfToken, {
-        httpOnly: true, secure: true, sameSite: 'none', path: '/',
-        expires: new Date(new Date().getTime() + cookiesSettings.COOKIE_AUTHENTICATION_TOKEN_EXPIRATION)
-    });
-
+    await issueTokens(res, existingUser._id.toString(), existingUser.csrfTokenSecret.secret);
     return res.status(200).json({ status: 'ok' });
 });
 
@@ -354,7 +350,6 @@ const ssoSignUpGoogleIdentityServices = tryCatch(async (req: express.Request, re
 
     const tokens = new Tokens();
     const csrfTokenSecret = tokens.secretSync();
-    const csrfToken = tokens.create(csrfTokenSecret);
 
     const savedCSRFTokenSecret = await CSRFTokenSecret.create({ secret: csrfTokenSecret });
     const savedProfile = await Profile.create({ fullName: name, profilePicture: userSettings.DEFAULT_PROFILE_PICTURE });
@@ -370,16 +365,30 @@ const ssoSignUpGoogleIdentityServices = tryCatch(async (req: express.Request, re
     await CSRFTokenSecret.findOneAndUpdate({ _id: savedCSRFTokenSecret._id }, { user_id: savedUser._id });
     await Profile.findOneAndUpdate({ _id: savedProfile._id }, { user_id: savedUser._id });
 
-    const authenticationToken = jwt.sign({ _id: savedUser._id }, process.env["AUTHENTICATION_TOKEN_SECRET"] as string, { expiresIn: jwtTokensSettings.JWT_AUTHENTICATION_TOKEN_EXPIRATION_STRING });
+    await issueTokens(res, savedUser._id.toString(), csrfTokenSecret);
+    return res.status(200).json({ status: 'ok' });
+});
 
-    res.cookie(cookiesSettings.COOKIE_AUTHENTICATION_TOKEN_NAME, authenticationToken, {
-        httpOnly: true, secure: true, sameSite: 'none', path: '/',
-        expires: new Date(new Date().getTime() + cookiesSettings.COOKIE_AUTHENTICATION_TOKEN_EXPIRATION)
-    });
-    res.cookie(cookiesSettings.COOKIE_CSRF_TOKEN_NAME, csrfToken, {
-        httpOnly: true, secure: true, sameSite: 'none', path: '/',
-        expires: new Date(new Date().getTime() + cookiesSettings.COOKIE_AUTHENTICATION_TOKEN_EXPIRATION)
-    });
+const refresh = tryCatch(async (req: express.Request, res: express.Response) => {
+    const incomingRefreshToken = req.cookies[cookiesSettings.COOKIE_REFRESH_TOKEN_NAME];
+    if (!incomingRefreshToken) throw new ErrorResponse(401, 'No refresh token.', errorCodes.NO_REFRESH_TOKEN);
+
+    const storedToken = await RefreshToken.findOne({ token: incomingRefreshToken });
+    if (!storedToken) throw new ErrorResponse(403, 'Invalid refresh token.', errorCodes.INVALID_REFRESH_TOKEN);
+
+    let decoded: any;
+    try {
+        decoded = jwt.verify(incomingRefreshToken, process.env["REFRESH_TOKEN_SECRET"] as string);
+    } catch {
+        await RefreshToken.findOneAndDelete({ token: incomingRefreshToken });
+        throw new ErrorResponse(403, 'Invalid refresh token.', errorCodes.INVALID_REFRESH_TOKEN);
+    }
+
+    const existingUser = await User.findOne({ _id: decoded._id }).populate('csrfTokenSecret');
+    if (!existingUser) throw new ErrorResponse(403, 'Invalid refresh token.', errorCodes.INVALID_REFRESH_TOKEN);
+
+    await RefreshToken.findOneAndDelete({ token: incomingRefreshToken });
+    await issueTokens(res, existingUser._id.toString(), existingUser.csrfTokenSecret.secret);
 
     return res.status(200).json({ status: 'ok' });
 });
@@ -391,6 +400,7 @@ export default {
     activate,
     login,
     logout,
+    refresh,
     forgotPassword,
     resetPassword,
     accountRecoveryResetPasswordVerifyToken,
