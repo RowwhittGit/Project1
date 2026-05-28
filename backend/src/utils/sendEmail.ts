@@ -1,4 +1,4 @@
-import { Resend } from 'resend';
+import { BrevoClient } from '@getbrevo/brevo';
 
 type SendEmailOptions = {
   to: string;
@@ -8,20 +8,19 @@ type SendEmailOptions = {
 };
 
 const sendEmail = async ({ to, subject, text, html }: SendEmailOptions) => {
-  const resend = new Resend(process.env["RESEND_API_KEY"] as string);
+  const client = new BrevoClient({ apiKey: process.env["EMAIL_API"] as string });
 
-  const { error } = await resend.emails.send({
-    from: `MERN <onboarding@resend.dev>`,
-    to,
-    subject,
-    html,
-    text,
-  });
-
-  if (error) {
-    console.error('RESEND ERROR:', JSON.stringify(error));
-  } else {
+  try {
+    await client.transactionalEmails.sendTransacEmail({
+      to: [{ email: to }],
+      subject,
+      htmlContent: html,
+      textContent: text,
+      sender: { name: 'MERN', email: process.env["EMAIL_FROM"] as string },
+    });
     console.log('Email sent successfully to:', to);
+  } catch (error) {
+    console.error('BREVO ERROR:', JSON.stringify(error));
   }
 };
 
