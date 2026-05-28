@@ -1,10 +1,8 @@
 import SibApiV3Sdk from 'sib-api-v3-sdk';
 
+SibApiV3Sdk.ApiClient.instance.authentications['api-key'].apiKey = process.env['BREVO_API_KEY'] as string;
+
 const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
-apiInstance.setApiKey(
-    SibApiV3Sdk.TransactionalEmailsApiApiKeys.apiKey,
-    process.env['BREVO_API_KEY'] as string
-);
 
 export default async function sendEmail({ to, subject, text, html }: {
     to: string;
