@@ -41,6 +41,7 @@
     "nodemailer": "^8.0.8",
     "qrcode": "^1.5.3",
     "rate-limit-mongo": "^2.3.2",
+    "resend": "^6.12.4",
     "speakeasy": "^2.0.0",
     "xss": "^1.0.14"
   },

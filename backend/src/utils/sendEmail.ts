@@ -1,6 +1,4 @@
-import nodemailer, { TransportOptions } from "nodemailer";
-import dns from 'dns';
-dns.setDefaultResultOrder('ipv4first');
+import { Resend } from 'resend';
 
 type SendEmailOptions = {
   to: string;
@@ -10,33 +8,21 @@ type SendEmailOptions = {
 };
 
 const sendEmail = async ({ to, subject, text, html }: SendEmailOptions) => {
-  const transporter = nodemailer.createTransport({
-    host: process.env["SMTP_HOST"] as string,
-    port: Number(process.env["SMTP_PORT"]),
-    secure: false,
-    family: 4,
-    auth: {
-      user: process.env["SMTP_USER"] as string,
-      pass: process.env["SMTP_PASSWORD"] as string,
-    }
-  } as TransportOptions); // * Cast the object to TransportOptions
+  const resend = new Resend(process.env["RESEND_API_KEY"] as string);
 
-  const emailOptions = {
-    from: `MERN <${process.env["EMAIL_FROM"] as string}>`,
+  const { error } = await resend.emails.send({
+    from: `MERN <onboarding@resend.dev>`,
     to,
     subject,
-    text,
     html,
-  };
-
-  // * Sending email activation account
-  transporter.sendMail(emailOptions, (error: any, info: any) => {
-    if (error) {
-      console.error('SMTP ERROR:', JSON.stringify(error));
-    } else {
-      console.log('Email sent:', info.response);
-    }
+    text,
   });
+
+  if (error) {
+    console.error('RESEND ERROR:', JSON.stringify(error));
+  } else {
+    console.log('Email sent successfully to:', to);
+  }
 };
 
 export default sendEmail;
