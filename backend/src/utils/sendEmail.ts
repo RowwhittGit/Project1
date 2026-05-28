@@ -1,8 +1,8 @@
-const Brevo = require('sib-api-v3-sdk');
+import SibApiV3Sdk from 'sib-api-v3-sdk';
 
-const apiInstance = new Brevo.TransactionalEmailsApi();
+const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
 apiInstance.setApiKey(
-    Brevo.TransactionalEmailsApiApiKeys.apiKey,
+    SibApiV3Sdk.TransactionalEmailsApiApiKeys.apiKey,
     process.env['BREVO_API_KEY'] as string
 );
 
@@ -12,7 +12,7 @@ export default async function sendEmail({ to, subject, text, html }: {
     text: string;
     html: string;
 }) {
-    const sendSmtpEmail = new Brevo.SendSmtpEmail();
+    const sendSmtpEmail = new SibApiV3Sdk.SendSmtpEmail();
     sendSmtpEmail.to = [{ email: to }];
     sendSmtpEmail.subject = subject;
     sendSmtpEmail.textContent = text;
